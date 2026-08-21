@@ -1,13 +1,20 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import { getAggregatedAvailability, getAllParticipants } from '../lib/db';
+import Layout from '../../../layouts/Layout.astro';
+import { getSalaByCodigo, getAggregatedAvailability, getParticipantsBySala } from '../../../lib/db';
+
+const { codigo } = Astro.params;
+const sala = codigo ? await getSalaByCodigo(codigo) : null;
+
+if (!sala) {
+  return Astro.redirect('/?error=sala-no-encontrada');
+}
 
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const DIAS_LARGO = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const HORAS = Array.from({ length: 14 }, (_, i) => i + 8);
 
-const aggregated = await getAggregatedAvailability();
-const totalParticipants = (await getAllParticipants()).length;
+const aggregated = await getAggregatedAvailability(sala.id);
+const totalParticipants = (await getParticipantsBySala(sala.id)).length;
 
 function countFor(day: number, hour: number) {
   return aggregated[`${day}-${hour}`]?.length || 0;
@@ -33,13 +40,12 @@ for (let d = 0; d < 7; d++) {
 }
 const topSlots = allSlots.filter((s) => s.count > 0).sort((a, b) => b.count - a.count).slice(0, 3);
 ---
-<Layout title="Cago verde">
+<Layout title={`${sala.nombre} · Resumen`} sala={sala}>
   <div class="card">
-    <h2>Resumen del equipo</h2>
-    <p class="hint">
+    <p class="hint" style="margin-bottom: 0;">
       {totalParticipants === 0
         ? 'Todavía nadie ha marcado su disponibilidad.'
-        : `${totalParticipants} persona(s) registrada(s). Entre más oscura/clara la casilla, más gente disponible.`}
+        : `${totalParticipants} persona(s) registrada(s).`}
     </p>
   </div>
 
@@ -48,11 +54,24 @@ const topSlots = allSlots.filter((s) => s.count > 0).sort((a, b) => b.count - a.
       {topSlots.map((s, i) => (
         <div class="top-slot-item">
           <span>{i + 1}. {DIAS_LARGO[s.day]} {s.hour}:00 - {s.hour + 1}:00</span>
-          <span class="badge">{s.count} disponible(s)</span>
+          <span class={`badge rank-${i + 1}`}>{s.count} disponible(s)</span>
         </div>
       ))}
     </div>
   )}
+
+  <div class="heat-legend">
+    <span class="heat-legend-label">Nadie</span>
+    <div class="heat-legend-bar">
+      <span class="level-0"></span>
+      <span class="level-1"></span>
+      <span class="level-2"></span>
+      <span class="level-3"></span>
+      <span class="level-4"></span>
+      <span class="level-5"></span>
+    </div>
+    <span class="heat-legend-label">Todos</span>
+  </div>
 
   <div class="grid-wrapper">
     <div class="avail-grid" id="summary-grid">

@@ -1,126 +1,141 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { getAllParticipants } from '../lib/db';
-
-const participants = await getAllParticipants();
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  const first = parts[0]?.[0] ?? '';
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
-  return (first + last).toUpperCase();
-}
 ---
-<Layout title="Cago verde">
-  {participants.length > 0 ? (
-    <>
-      <div class="card">
-        <h2>¿Quién eres?</h2>
-        <p class="hint">Toca tu nombre para marcar tu disponibilidad.</p>
-        <div class="player-grid">
-          {participants.map((p) => (
-            <button type="button" class="player-btn" data-id={p.id} data-name={p.name}>
-              <span class="player-avatar">{initials(p.name)}</span>
-              <span class="player-name">{p.name}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div class="card add-player-card">
-        <button type="button" id="toggle-add-btn" class="link-muted" aria-expanded="false">
-          + No estoy en la lista, agregar mi nombre
-        </button>
-        <div id="add-form" class="hidden">
-          <div class="form-group" style="margin-top: 14px;">
-            <label for="name">Nombre</label>
-            <input type="text" id="name" placeholder="Ej. Carlos" maxlength="40" autocomplete="name" />
-          </div>
-          <button id="continue-btn">Agregar y continuar</button>
-          <p id="error-msg" class="hint" style="color: var(--color-danger); display:none;"></p>
-        </div>
-      </div>
-    </>
-  ) : (
-    <div class="card">
-      <h2>Sé el primero en registrarte</h2>
-      <p class="hint">Todavía nadie se ha registrado. Escribe tu nombre para empezar.</p>
-      <div id="add-form">
-        <div class="form-group">
-          <label for="name">Nombre</label>
-          <input type="text" id="name" placeholder="Ej. Carlos" maxlength="40" autocomplete="name" />
-        </div>
-        <button id="continue-btn">Agregar y continuar</button>
-        <p id="error-msg" class="hint" style="color: var(--color-danger); display:none;"></p>
-      </div>
+<Layout title="Convoca · Inicio">
+  <div class="card">
+    <div class="tab-toggle" role="group" aria-label="Unirme o crear sala">
+      <button type="button" id="tab-join-btn" class="tab-btn active">Unirme</button>
+      <button type="button" id="tab-create-btn" class="tab-btn">Crear</button>
     </div>
-  )}
+
+    <h2 id="form-title">Únete a una sala</h2>
+    <p class="hint" id="form-hint">Ingresa el código que te compartieron para entrar al calendario de tu equipo.</p>
+
+    <div class="form-group">
+      <label for="main-input" id="main-label">Código de sala</label>
+      <input type="text" id="main-input" placeholder="Ej. 67823" maxlength="10" autocomplete="off" inputmode="numeric" />
+    </div>
+
+    <button id="submit-btn">Entrar</button>
+    <p id="error-msg" class="hint" style="color: var(--color-danger); display:none;"></p>
+  </div>
 </Layout>
 
 <script>
-  type Participant = { id: string; name: string };
+  type Sala = { id: string; codigo: string; nombre: string };
+  type Mode = 'join' | 'create';
 
-  function selectParticipant(participant: Participant) {
-    localStorage.setItem('participant', JSON.stringify(participant));
-    window.location.href = '/disponibilidad';
+  function goToSala(sala: Sala) {
+    localStorage.setItem('sala', JSON.stringify(sala));
+    localStorage.removeItem('participant');
+    window.location.href = `/sala/${sala.codigo}`;
   }
 
-  document.querySelectorAll<HTMLButtonElement>('.player-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      selectParticipant({ id: btn.dataset.id!, name: btn.dataset.name! });
-    });
-  });
+  const tabJoinBtn = document.getElementById('tab-join-btn') as HTMLButtonElement;
+  const tabCreateBtn = document.getElementById('tab-create-btn') as HTMLButtonElement;
+  const formTitle = document.getElementById('form-title')!;
+  const formHint = document.getElementById('form-hint')!;
+  const mainLabel = document.getElementById('main-label')!;
+  const mainInput = document.getElementById('main-input') as HTMLInputElement;
+  const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
 
-  const toggleBtn = document.getElementById('toggle-add-btn') as HTMLButtonElement | null;
-  const addForm = document.getElementById('add-form') as HTMLDivElement | null;
+  let mode: Mode = 'join';
 
-  toggleBtn?.addEventListener('click', () => {
-    const isHidden = addForm?.classList.contains('hidden');
-    addForm?.classList.toggle('hidden');
-    toggleBtn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
-    if (isHidden) {
-      document.getElementById('name')?.focus();
+  function setMode(next: Mode) {
+    mode = next;
+    tabJoinBtn.classList.toggle('active', next === 'join');
+    tabCreateBtn.classList.toggle('active', next === 'create');
+
+    errorMsg.style.display = 'none';
+    mainInput.value = '';
+
+    if (next === 'join') {
+      formTitle.textContent = 'Únete a una sala';
+      formHint.textContent = 'Ingresa el código que te compartieron para entrar al calendario de tu equipo.';
+      mainLabel.textContent = 'Código de sala';
+      mainInput.placeholder = 'Ej. 67823';
+      mainInput.maxLength = 10;
+      mainInput.inputMode = 'numeric';
+      submitBtn.textContent = 'Entrar';
+    } else {
+      formTitle.textContent = 'Crea una sala nueva';
+      formHint.textContent = 'Crea un espacio nuevo para tu equipo. Te daremos un código para compartir.';
+      mainLabel.textContent = 'Nombre de la sala';
+      mainInput.placeholder = 'Ej. Cabo Verde Entrenamientos';
+      mainInput.maxLength = 60;
+      mainInput.inputMode = 'text';
+      submitBtn.textContent = 'Crear sala';
     }
-  });
 
-  const submitBtn = document.getElementById('continue-btn') as HTMLButtonElement | null;
-  const input = document.getElementById('name') as HTMLInputElement | null;
-  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement | null;
+    mainInput.focus();
+  }
 
-  async function submitName() {
-    if (!input || !submitBtn || !errorMsg) return;
-    const name = input.value.trim();
+  tabJoinBtn.addEventListener('click', () => setMode('join'));
+  tabCreateBtn.addEventListener('click', () => setMode('create'));
+
+  async function doJoin() {
+    const codigo = mainInput.value.trim();
+    errorMsg.style.display = 'none';
+    if (!codigo) {
+      errorMsg.textContent = 'Escribe un código.';
+      errorMsg.style.display = 'block';
+      return;
+    }
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Buscando...';
+    try {
+      const res = await fetch(`/api/salas?codigo=${encodeURIComponent(codigo)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se encontró la sala');
+      goToSala(data);
+    } catch (err: any) {
+      errorMsg.textContent = err.message || 'Ocurrió un error, intenta de nuevo.';
+      errorMsg.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Entrar';
+    }
+  }
+
+  async function doCreate() {
+    const nombre = mainInput.value.trim();
     errorMsg.style.display = 'none';
 
-    if (!name) {
-      errorMsg.textContent = 'Por favor escribe tu nombre.';
+    if (!nombre) {
+      errorMsg.textContent = 'Escribe un nombre para la sala.';
       errorMsg.style.display = 'block';
       return;
     }
 
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Guardando...';
+    submitBtn.textContent = 'Creando...';
 
     try {
-      const res = await fetch('/api/participantes', {
+      const res = await fetch('/api/salas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ nombre }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al registrar');
-
-      selectParticipant(data);
+      if (!res.ok) throw new Error(data.error || 'No se pudo crear la sala');
+      goToSala(data);
     } catch (err: any) {
       errorMsg.textContent = err.message || 'Ocurrió un error, intenta de nuevo.';
       errorMsg.style.display = 'block';
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Agregar y continuar';
+      submitBtn.textContent = 'Crear sala';
     }
   }
 
-  submitBtn?.addEventListener('click', submitName);
-  input?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') submitName();
+  submitBtn.addEventListener('click', () => {
+    if (mode === 'join') doJoin();
+    else doCreate();
+  });
+
+  mainInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      if (mode === 'join') doJoin();
+      else doCreate();
+    }
   });
 </script>

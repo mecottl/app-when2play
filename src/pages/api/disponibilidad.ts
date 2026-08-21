@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getAvailability, setAvailability, getAllParticipants } from '../../lib/db';
+import { getAvailability, setAvailability, getParticipantById } from '../../lib/db';
 
 export const GET: APIRoute = async ({ url }) => {
   const participantId = url.searchParams.get('participantId');
@@ -28,9 +28,8 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response(JSON.stringify({ error: 'Datos inválidos' }), { status: 400 });
     }
 
-    const participants = await getAllParticipants();
-    const exists = participants.some((p) => p.id === participantId);
-    if (!exists) {
+    const participant = await getParticipantById(participantId);
+    if (!participant) {
       return new Response(JSON.stringify({ error: 'Participante no encontrado' }), { status: 404 });
     }
 

@@ -1,21 +1,31 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import Layout from '../../../layouts/Layout.astro';
+import { getSalaByCodigo } from '../../../lib/db';
 
-const DIAS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+const { codigo } = Astro.params;
+const sala = codigo ? await getSalaByCodigo(codigo) : null;
+
+if (!sala) {
+  return Astro.redirect('/?error=sala-no-encontrada');
+}
+
+const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const HORAS = Array.from({ length: 14 }, (_, i) => i + 8);
 ---
-<Layout title="Cago verde">
+<Layout title={`${sala.nombre} · Mi disponibilidad`} sala={sala}>
+  <div id="page-data" data-codigo={sala.codigo} hidden></div>
+
   <div class="card">
     <h2 id="greeting">Mi disponibilidad</h2>
     <p class="hint">
       Toca una casilla para marcarla. En el celular, activa "Marcar varias" si quieres
       arrastrar el dedo para marcar varias casillas seguidas. No olvides guardar al terminar.
     </p>
-    <button id="switch-user-btn" class="link-muted">¿No eres tú? Cambiar de nombre</button>
+    <button id="switch-user-btn" class="link-muted">¿No eres tú? Cambiar de jugador</button>
   </div>
 
   <div class="mode-toggle" role="group" aria-label="Modo de interacción con el calendario">
-    <button type="button" id="mode-scroll-btn" class="mode-btn active">Desplazarme</button>
+    <button type="button" id="mode-scroll-btn" class="mode-btn active">Desplazar</button>
     <button type="button" id="mode-paint-btn" class="mode-btn">Marcar varias</button>
   </div>
 
@@ -41,11 +51,14 @@ const HORAS = Array.from({ length: 14 }, (_, i) => i + 8);
 </Layout>
 
 <script>
-  type Participant = { id: string; name: string };
+  type Participant = { id: string; name: string; numero: number | null };
+
+  const pageData = document.getElementById('page-data')!;
+  const codigo = pageData.dataset.codigo!;
 
   const raw = localStorage.getItem('participant');
   if (!raw) {
-    window.location.href = '/';
+    window.location.href = `/sala/${codigo}`;
   }
   const participant: Participant | null = raw ? JSON.parse(raw) : null;
 
@@ -56,7 +69,7 @@ const HORAS = Array.from({ length: 14 }, (_, i) => i + 8);
 
   document.getElementById('switch-user-btn')?.addEventListener('click', () => {
     localStorage.removeItem('participant');
-    window.location.href = '/';
+    window.location.href = `/sala/${codigo}`;
   });
 
   const grid = document.getElementById('avail-grid')!;
@@ -66,8 +79,6 @@ const HORAS = Array.from({ length: 14 }, (_, i) => i + 8);
   const paintBtn = document.getElementById('mode-paint-btn') as HTMLButtonElement;
 
   let selected = new Set<string>();
-
-  // Modo para touch: 'scroll' (desplazarse) o 'paint' (marcar arrastrando)
   let touchMode: 'scroll' | 'paint' = 'scroll';
 
   function setTouchMode(mode: 'scroll' | 'paint') {
@@ -81,10 +92,7 @@ const HORAS = Array.from({ length: 14 }, (_, i) => i + 8);
   scrollBtn.addEventListener('click', () => setTouchMode('scroll'));
   paintBtn.addEventListener('click', () => setTouchMode('paint'));
 
-  // --- Mouse: arrastrar siempre pinta varias celdas (desktop) ---
   let mouseDragging = false;
-
-  // --- Touch: estado compartido ---
   let dragMode: 'add' | 'remove' = 'add';
   let startCell: HTMLElement | null = null;
   let startX = 0;
@@ -141,7 +149,6 @@ const HORAS = Array.from({ length: 14 }, (_, i) => i + 8);
       return;
     }
 
-    // Touch / pen
     startCell = target;
     startX = e.clientX;
     startY = e.clientY;
@@ -173,7 +180,6 @@ const HORAS = Array.from({ length: 14 }, (_, i) => i + 8);
       return;
     }
 
-    // Modo scroll: solo detectamos si se movió, para no marcar la celda al soltar
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
     if (Math.hypot(dx, dy) > MOVE_THRESHOLD) {
@@ -224,11 +230,11 @@ const HORAS = Array.from({ length: 14 }, (_, i) => i + 8);
       });
       if (!res.ok) throw new Error('Error al guardar');
       saveStatus.style.color = 'var(--color-success)';
-      saveStatus.textContent = '✅ Disponibilidad guardada';
+      saveStatus.textContent = 'Disponibilidad guardada';
       setTimeout(() => (saveStatus.textContent = ''), 3000);
     } catch {
       saveStatus.style.color = 'var(--color-danger)';
-      saveStatus.textContent = '❌ No se pudo guardar, intenta de nuevo.';
+      saveStatus.textContent = 'No se pudo guardar. Intenta de nuevo.';
     } finally {
       saveBtn.disabled = false;
       saveBtn.textContent = 'Guardar disponibilidad';

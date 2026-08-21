@@ -3,9 +3,10 @@ import '../styles/global.css';
 
 interface Props {
   title?: string;
+  sala?: { id: string; codigo: string; nombre: string } | null;
 }
 
-const { title = 'Disponibilidad del equipo' } = Astro.props;
+const { title = 'Convoca', sala = null } = Astro.props;
 ---
 <!doctype html>
 <html lang="es">
@@ -13,24 +14,52 @@ const { title = 'Disponibilidad del equipo' } = Astro.props;
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>{title}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
 <body>
   <header class="app-header">
-    <h1>📅 Disponibilidad del equipo</h1>
-    <nav>
-      <a href="/">Inicio</a>
-      <a href="/disponibilidad" id="nav-disponibilidad" class="hidden">Mi disponibilidad</a>
-      <a href="/resumen">Resumen</a>
-    </nav>
-    <script is:inline>
-      if (localStorage.getItem('participant')) {
-        document.getElementById('nav-disponibilidad')?.classList.remove('hidden');
-      }
-    </script>
+    <div class="header-inner">
+      <div class="header-top">
+        <div>
+          <p class="brand-mark">Convoca</p>
+          <h1>{sala ? sala.nombre : 'Convoca'}</h1>
+        </div>
+        {sala && (
+          <button type="button" id="leave-sala-btn" class="leave-btn">Salir</button>
+        )}
+      </div>
+
+      {sala && (
+        <nav id="sala-nav">
+          <a href={`/sala/${sala.codigo}`}>Jugadores</a>
+          <a href={`/sala/${sala.codigo}/disponibilidad`} id="nav-disponibilidad" class="hidden">Mi disponibilidad</a>
+          <a href={`/sala/${sala.codigo}/resumen`}>Resumen</a>
+        </nav>
+      )}
+    </div>
+    <div class="header-divider"></div>
   </header>
-  <div class="flag-stripe"><span></span><span></span><span></span><span></span><span></span></div>
   <main>
     <slot />
   </main>
+
+  {sala && (
+    <script is:inline>
+      (function () {
+        var leaveBtn = document.getElementById('leave-sala-btn');
+        leaveBtn && leaveBtn.addEventListener('click', function () {
+          localStorage.removeItem('participant');
+          window.location.href = '/';
+        });
+
+        if (localStorage.getItem('participant')) {
+          var navDisp = document.getElementById('nav-disponibilidad');
+          if (navDisp) navDisp.classList.remove('hidden');
+        }
+      })();
+    </script>
+  )}
 </body>
 </html>

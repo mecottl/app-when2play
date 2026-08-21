@@ -1,0 +1,131 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getSalaByCodigo, getParticipantsBySala } from '../../lib/db';
+
+const { codigo } = Astro.params;
+const sala = codigo ? await getSalaByCodigo(codigo) : null;
+
+if (!sala) {
+  return Astro.redirect('/?error=sala-no-encontrada');
+}
+
+const participants = await getParticipantsBySala(sala.id);
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? '';
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
+  return (first + last).toUpperCase();
+}
+---
+<Layout title={`${sala.nombre} · Convoca`} sala={sala}>
+  <div id="sala-data" data-sala-id={sala.id} data-sala-codigo={sala.codigo} hidden></div>
+
+  <div class="card">
+    <p class="eyebrow">Código de la sala</p>
+    <div class="sala-code-hero">{sala.codigo}</div>
+    <p class="hint">Comparte este código con tu equipo para que se unan.</p>
+  </div>
+
+  {participants.length > 0 && (
+    <div class="card">
+      <h2>¿Quién eres?</h2>
+      <p class="hint">Toca tu nombre para marcar tu disponibilidad.</p>
+      <div class="player-grid">
+        {participants.map((p) => (
+          <button type="button" class="player-btn" data-id={p.id} data-name={p.name}>
+            <span class="player-avatar">{p.numero ?? initials(p.name)}</span>
+            <span class="player-name">{p.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )}
+
+  <div class="card add-player-card">
+    <button type="button" id="toggle-add-btn" class="link-muted" aria-expanded={participants.length === 0 ? 'true' : 'false'}>
+      + No estoy en la lista, agregar mi nombre
+    </button>
+    <div id="add-form" class={participants.length > 0 ? 'hidden' : ''}>
+      <div class="form-group" style="margin-top: 14px;">
+        <label for="name">Nombre</label>
+        <input type="text" id="name" placeholder="Ej. Carlos" maxlength="40" autocomplete="name" />
+      </div>
+      <div class="form-group">
+        <label for="numero">Número de camiseta (opcional)</label>
+        <input type="text" id="numero" placeholder="Ej. 10" maxlength="3" inputmode="numeric" />
+      </div>
+      <button id="continue-btn">Agregar y continuar</button>
+      <p id="error-msg" class="hint" style="color: var(--color-danger); display:none;"></p>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  type Participant = { id: string; name: string; numero: number | null };
+
+  const salaData = document.getElementById('sala-data')!;
+  const salaId = salaData.dataset.salaId!;
+  const salaCodigo = salaData.dataset.salaCodigo!;
+
+  function selectParticipant(participant: Participant) {
+    localStorage.setItem('participant', JSON.stringify(participant));
+    window.location.href = `/sala/${salaCodigo}/disponibilidad`;
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('.player-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      selectParticipant({ id: btn.dataset.id!, name: btn.dataset.name!, numero: null });
+    });
+  });
+
+  const toggleBtn = document.getElementById('toggle-add-btn') as HTMLButtonElement | null;
+  const addForm = document.getElementById('add-form') as HTMLDivElement | null;
+
+  toggleBtn?.addEventListener('click', () => {
+    const isHidden = addForm?.classList.contains('hidden');
+    addForm?.classList.toggle('hidden');
+    toggleBtn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+    if (isHidden) document.getElementById('name')?.focus();
+  });
+
+  const submitBtn = document.getElementById('continue-btn') as HTMLButtonElement | null;
+  const nameInput = document.getElementById('name') as HTMLInputElement | null;
+  const numeroInput = document.getElementById('numero') as HTMLInputElement | null;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement | null;
+
+  async function submitName() {
+    if (!nameInput || !numeroInput || !submitBtn || !errorMsg) return;
+    const name = nameInput.value.trim();
+    const numero = numeroInput.value.trim();
+    errorMsg.style.display = 'none';
+
+    if (!name) {
+      errorMsg.textContent = 'Por favor escribe tu nombre.';
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Guardando...';
+
+    try {
+      const res = await fetch('/api/participantes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ salaId, name, numero: numero || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al registrar');
+      selectParticipant(data);
+    } catch (err: any) {
+      errorMsg.textContent = err.message || 'Ocurrió un error, intenta de nuevo.';
+      errorMsg.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Agregar y continuar';
+    }
+  }
+
+  submitBtn?.addEventListener('click', submitName);
+  nameInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitName(); });
+</script>
