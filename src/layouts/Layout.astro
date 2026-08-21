@@ -6,7 +6,7 @@ interface Props {
   sala?: { id: string; codigo: string; nombre: string } | null;
 }
 
-const { title = 'Convoca', sala = null } = Astro.props;
+const { title = 'when2 play', sala = null } = Astro.props;
 ---
 <!doctype html>
 <html lang="es">
@@ -23,8 +23,8 @@ const { title = 'Convoca', sala = null } = Astro.props;
     <div class="header-inner">
       <div class="header-top">
         <div>
-          <p class="brand-mark">Convoca</p>
-          <h1>{sala ? sala.nombre : 'Convoca'}</h1>
+          <p class="brand-mark">when2 play</p>
+          <h1>{sala ? sala.nombre : 'when2 play'}</h1>
         </div>
         {sala && (
           <button type="button" id="leave-sala-btn" class="leave-btn">Salir</button>
